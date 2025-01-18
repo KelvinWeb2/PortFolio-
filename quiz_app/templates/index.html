@@ -3,10 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <title>Quiz App</title>
 </head>
 <body>
-    <h1>Welcome to the Quiz App</h1>
-    <p>This is the starting point of our app.</p>
+    <div class="container">
+        <h1>Welcome to the Quiz App</h1>
+        <p>This is the starting point of our app.</p>
+        <button onclick="startQuiz()">Start Quiz</button>
+    </div>
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
