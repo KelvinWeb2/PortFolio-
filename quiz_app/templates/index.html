@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -13,5 +13,32 @@
         <button onclick="startQuiz()">Start Quiz</button>
     </div>
 <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Quiz App</title>
+	<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</head>
+<body>
+    <h1>Quiz App</h1>
+    <form action="/result" method="POST">
+        {% for question in questions %}
+        <div>
+            <p>{{ question.id }}. {{ question.question }}</p>
+            {% for option in question.options %}
+            <label>
+                <input type="radio" name="question{{ question.id }}" value="{{ option }}">
+                {{ option }}
+            </label><br>
+            {% endfor %}
+        </div>
+        {% endfor %}
+        <button type="submit">Submit</button>
+    </form>
 </body>
 </html>
