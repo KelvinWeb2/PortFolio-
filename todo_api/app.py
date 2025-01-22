@@ -1,79 +1,128 @@
 from flask import Flask, request, jsonify
+from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 import sqlite3
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'your_secret_key'  # Replace with a secure secret key
 
-# Database connection helper function
-def get_db_connection():
-    conn = sqlite3.connect('tasks.db')  # Connect to the SQLite database
-    conn.row_factory = sqlite3.Row     # Return rows as dictionaries
-    return conn
-
-# Initialize the database
-@app.route('/init_db', methods=['GET'])
+# Initialize database
 def init_db():
-    conn = get_db_connection()
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            status TEXT NOT NULL
-        )
-    ''')
+    conn = sqlite3.connect('tasks.db')
+    cursor = conn.cursor()
+
+    # Users table
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL
+    )''')
+
+    # Tasks table
+    cursor.execute('''CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT DEFAULT 'Incomplete',
+        user_id INTEGER,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    )''')
+
     conn.commit()
     conn.close()
-    return jsonify({"message": "Database initialized!"})
 
-# Add a new task
-@app.route('/tasks', methods=['POST'])
-def add_task():
-    data = request.get_json()
-    if not data.get('title'):
-        return jsonify({"error": "title is required"}), 400
+# Generate token
+def generate_token(user_id):
+    s = Serializer(app.config['SECRET_KEY'], expires_in=3600)  # Token expires in 1 hour
+    return s.dumps({'user_id': user_id}).decode('utf-8')
 
-    title = data['title']
-    status = data.get('status', "Incomplete")
-    
-    conn = get_db_connection()
-    conn.execute('INSERT INTO tasks (title, status) VALUES (?, ?)', (title, status))
-    conn.commit()
+# Verify token
+def verify_token(token):
+    s = Serializer(app.config['SECRET_KEY'])
+    try:
+        data = s.loads(token)
+        return data['user_id']
+    except:
+        return None
+
+# User registration
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return jsonify({'error': 'Username and password are required'}), 400
+
+    conn = sqlite3.connect('tasks.db')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        return jsonify({'error': 'Username already exists'}), 400
+    finally:
+        conn.close()
+
+    return jsonify({'message': 'User registered successfully'}), 201
+
+# User login
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return jsonify({'error': 'Username and password are required'}), 400
+
+    conn = sqlite3.connect('tasks.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT id FROM users WHERE username = ? AND password = ?', (username, password))
+    user = cursor.fetchone()
     conn.close()
-    
-    return jsonify({"message": "Task added successfully!", "task": {"title": title, "status": status}})
 
-# Get all tasks
-@app.route('/tasks', methods=['GET'])
-def get_tasks():
-    conn = get_db_connection()
-    tasks = conn.execute('SELECT * FROM tasks').fetchall()
-    conn.close()
+    if user:
+        token = generate_token(user[0])
+        return jsonify({'token': token}), 200
+    else:
+        return jsonify({'error': 'Invalid credentials'}), 401
 
-    tasks_list = [{"id": task["id"], "title": task["title"], "status": task["status"]} for task in tasks]
-    return jsonify({"tasks": tasks_list})
+# Protected route (example)
+@app.route('/tasks', methods=['GET', 'POST'])
+def tasks():
+    token = request.headers.get('Authorization')
+    if not token:
+        return jsonify({'error': 'Token is missing'}), 401
 
-# Update a task
-@app.route('/tasks/<int:task_id>', methods=['PUT'])
-def update_task(task_id):
-    data = request.get_json()
-    title = data.get('title')
-    status = data.get('status')
-    
-    conn = get_db_connection()
-    conn.execute('UPDATE tasks SET title = ?, status = ? WHERE id = ?', (title, status, task_id))
-    conn.commit()
-    conn.close()
-    
-    return jsonify({"message": "Task updated successfully!"})
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({'error': 'Invalid or expired token'}), 401
 
-# Delete a task
-@app.route('/tasks/<int:task_id>', methods=['DELETE'])
-def delete_task(task_id):
-    conn = get_db_connection()
-    conn.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
-    conn.commit()
-    conn.close()
-    
-    return jsonify({"message": "Task deleted successfully!"})
+    conn = sqlite3.connect('tasks.db')
+    cursor = conn.cursor()
 
+    if request.method == 'POST':
+        data = request.json
+        title = data.get('title')
+        description = data.get('description')
+
+        if not title:
+            return jsonify({'error': 'Title is required'}), 400
+
+        cursor.execute('INSERT INTO tasks (title, description, user_id) VALUES (?, ?, ?)', (title, description, user_id))
+        conn.commit()
+        conn.close()
+        return jsonify({'message': 'Task created successfully'}), 201
+
+    elif request.method == 'GET':
+        cursor.execute('SELECT id, title, description, status FROM tasks WHERE user_id = ?', (user_id,))
+        tasks = [{'id': row[0], 'title': row[1], 'description': row[2], 'status': row[3]} for row in cursor.fetchall()]
+        conn.close()
+        return jsonify({'tasks': tasks}), 200
+
+# Initialize database
 if __name__ == '__main__':
+    init_db()
     app.run(debug=True)
