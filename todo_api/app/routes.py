@@ -1,7 +1,9 @@
-from flask import Blueprint, jsonify
+from flask import Flask, jsonify
+from app.models import todos, Todo
 
-api_bp = Blueprint('api', __name__)
+app = Flask(__name__)
 
-@api_bp.route('/todos', methods=['GET'])
+@app.route('/todos', methods=['GET'])
 def get_todos():
-    return jsonify({'message': 'Welcome to the Todo API!'})
+    """Retrieve all todos"""
+    return jsonify([todo.to_dict() for todo in todos]), 200
