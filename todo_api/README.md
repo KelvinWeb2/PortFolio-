@@ -1,11 +1,7 @@
-# Task Manager API
+# Todo API
 
-## Overview
-A simple RESTful API built using Flask and SQLite to manage tasks.
+A simple Todo API built using Node.js and Express.js. This API allows users to:
+- Create todos
+- View all todos
+- Delete todos
 
-## Features
-- Add new tasks.
-- View all tasks.
-- Update existing tasks.
-- Delete tasks.
- 
