@@ -1,10 +1,7 @@
 from flask import Flask
+from app.routes import app
 
 def create_app():
-    app = Flask(__name__)
-    app.config.from_object('config')
-    
-    from .routes import api_bp
-    app.register_blueprint(api_bp, url_prefix='/api')
-
+    """Create and configure the app"""
+    app.config['DEBUG'] = True
     return app
