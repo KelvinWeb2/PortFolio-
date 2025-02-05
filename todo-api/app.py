@@ -1,6 +1,5 @@
-
 from flask import Flask, jsonify, request
-from models import db, Task
+from models.models import db, Task
 
 app = Flask(__name__)
 
